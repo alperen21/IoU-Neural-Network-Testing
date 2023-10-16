@@ -40,7 +40,7 @@ def bbox_iou(box1, box2):
     return iou
 
 class Image:
-    def __call__(self, img_url : str, boxes : list[list[float]]) -> Any:
+    def __init__(self, img_url : str, boxes : list[list[float]]) -> Any:
         self.img_url = img_url
         self.boxes = boxes
     

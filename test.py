@@ -10,26 +10,30 @@ class Test_IoU:
         self.models = models
         self.images = images
     
-    def test_iou(self, model):
-        iou_results = list()
+    def test_iou(self, model_tuple):
+        iou_results = [0]
         time_results = list()
+
+        model_name, model = model_tuple
         
         for image in images:
             start_time = time.time()
-            results = model.predict(image)
+            results = model.predict(image.img_url)
             end_time = time.time()
 
             boxes = results[0].boxes.xyxy[0]        
 
-            iou_results.append(bbox_iou(boxes, boxes))
+
+            iou_results.append(bbox_iou(boxes.unsqueeze(0), boxes.unsqueeze(0)).item())
+
             time_results.append(end_time - start_time)
             
     
         average_iou = statistics.mean(iou_results)
         average_time = statistics.mean(time_results)
 
-        print(f"Average time for {model.name} is {average_time}")
-        print(f"Average IoU for {model.name} is {average_iou}")
+        print(f"Average time for {model_name} is {average_time}")
+        print(f"Average IoU for {model_name} is {average_iou}")
     
     def run(self):
         for model in models:
