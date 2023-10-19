@@ -23,13 +23,16 @@ class Test_IoU:
 
             boxes = results[0].boxes.xyxy[0]        
 
-
-            iou_results.append(bbox_iou(boxes.unsqueeze(0), boxes.unsqueeze(0)).item())
-
-            time_results.append(end_time - start_time)
+            time_result = end_time - start_time
+            iou_result = bbox_iou(boxes.unsqueeze(0), boxes.unsqueeze(0)).item()
             
-            print(f"{model_name}, {image.img_url}")
+            iou_results.append(iou_result)
+            time_results.append(time_result)
+            
+            print(f"{model_name}, {image.img_url}, iou: {iou_result}, time: {time_result}")
     
+        print("*"*20)
+        print("average results")
         average_iou = statistics.mean(iou_results)
         average_time = statistics.mean(time_results)
 
