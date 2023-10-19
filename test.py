@@ -3,6 +3,7 @@ from iou import bbox_iou
 from input import models, images
 import statistics
 import time
+import cv2
 
 
 class Test_IoU:
@@ -39,8 +40,30 @@ class Test_IoU:
         print(f"Average time for {model_name} is {average_time}")
         print(f"Average IoU for {model_name} is {average_iou}")
     
+    def test_class(self, model_tuple):
+        model_name, model = model_tuple
+
+        for image in images:
+            img = cv2.imread(image.img_url)
+            results = model.predict(img)
+            boxes_object = results[0].boxes
+            labels = boxes_object.cls  # Use 'cls' for class labels (e.g., 0 for 'person', 5 for 'bus', etc.)
+            names = results[0].names
+            class_names = [names[int(i)] for i in labels]
+
+            
+            for class_ in image.classes:
+                assert class_ in class_names, f"Model: {model_name} could not detect class: {class_} in image {image.img_url}"
+            
+            for class_ in class_names:
+                assert class_ in image.classes, f"Model: {model_name} detected an extra class: {class_} in image {image.img_url}"
+
+
+            
+
     def run(self):
         for model in models:
+            self.test_class(model)
             self.test_iou(model)
 
 

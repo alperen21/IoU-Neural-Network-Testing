@@ -6,5 +6,9 @@ models = [(weights, YOLO(weights)) for weights in [
 ]]
 
 images = [
-    Image("bus.jpg", [[12, 12, 12, 12], [12, 12, 12, 12]]),
+    Image(
+            img_url = "bus.jpg", 
+            boxes = [[12, 12, 12, 12], [12, 12, 12, 12]], 
+            classes = ["bus", "person"]
+        ),
 ]
