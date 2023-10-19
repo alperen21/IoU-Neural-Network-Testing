@@ -23,3 +23,33 @@ class_names = [names[int(i)] for i in labels]
 print("Bounding boxes:", bounding_boxes)
 print("Predicted classes:", class_names)
 print("Confidence scores:", confidence_scores)
+
+import cv2
+import os
+
+def draw_predictions(img, boxes, class_names, confidences):
+    for box, label, conf in zip(boxes, class_names, confidences):
+        # Extract coordinates
+        x1, y1, x2, y2 = map(int, box)
+
+        # Draw bounding box
+        cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+        # Display label and confidence score
+        text = f"{label} {conf:.2f}"
+        cv2.putText(img, text, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+    return img
+
+# Draw predictions on the image
+img_with_boxes = draw_predictions(results[0].orig_img, bounding_boxes, class_names, confidence_scores)
+
+# Specify output folder and save the image
+output_folder = 'output_images'
+if not os.path.exists(output_folder):
+    os.makedirs(output_folder)
+
+output_path = os.path.join(output_folder, 'result_image.jpg')
+cv2.imwrite(output_path, img_with_boxes)
+print(f"Image saved to {output_path}")
+

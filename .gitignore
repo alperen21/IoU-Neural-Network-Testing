@@ -1,3 +1,5 @@
 myenv
 *.jpg
 *.pt
+output_images/*
+main.py
