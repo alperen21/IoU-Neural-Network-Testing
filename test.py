@@ -28,6 +28,7 @@ class Test_IoU:
 
             time_results.append(end_time - start_time)
             
+            print(f"{model_name}, {image.img_url}")
     
         average_iou = statistics.mean(iou_results)
         average_time = statistics.mean(time_results)
