@@ -1,11 +1,13 @@
 from ultralytics import YOLO
-from iou import bbox_iou, draw_predictions
-from input import model_tuples, images, iou_threshold
+from util.iou import bbox_iou
+from util.predictions import draw_predictions
+from config import model_weights, images, iou_threshold
 import statistics
+from util.input import get_model_tuples
 import time
 import os
 import cv2
-from logger import setup_logger, get_filename
+from logger.logger import setup_logger, get_filename
 
 
 class Test_IoU:
@@ -24,7 +26,7 @@ class Test_IoU:
         for image in images:
 
             start_time = time.time()
-            results = model.predict(image.img_url)
+            results = model.predict(image['img_url'])
             end_time = time.time()
 
             for result in results:
@@ -40,9 +42,9 @@ class Test_IoU:
                     
                     if iou_result > iou_threshold:
                         passed = False
-                        self.logger.error(f"{model_name}, {image.img_url}, iou: {iou_result}, time: {time_result}, box: {box}")
+                        self.logger.error(f"{model_name}, {image['img_url']}, iou: {iou_result}, time: {time_result}, box: {box}")
                     else:
-                        self.logger.info(f"{model_name}, {image.img_url}, iou: {iou_result}, time: {time_result}, box: {box}")
+                        self.logger.info(f"{model_name}, {image['img_url']}, iou: {iou_result}, time: {time_result}, box: {box}")
     
         self.logger.info("*"*20)
         self.logger.info("average results")
@@ -61,7 +63,7 @@ class Test_IoU:
         model_name, model = model_tuple
 
         for image in images:
-            img = cv2.imread(image.img_url)
+            img = cv2.imread(image["img_url"])
             results = model.predict(img)
             boxes_object = results[0].boxes
             labels = boxes_object.cls  # Use 'cls' for class labels (e.g., 0 for 'person', 5 for 'bus', etc.)
@@ -70,10 +72,10 @@ class Test_IoU:
 
             try:
                 for class_ in image.classes:
-                    assert class_ in class_names, f"Model: {model_name} could not detect class: {class_} in image {image.img_url}"
+                    assert class_ in class_names, f"Model: {model_name} could not detect class: {class_} in image {image['img_url']}"
                 #yanlış index verirse falan hangisinin olduğunu yazdır, iou mu yanlış yoksa class mı yanlış differentiate
                 for class_ in class_names:
-                    assert class_ in image.classes, f"Model: {model_name} detected an extra class: {class_} in image {image.img_url}"
+                    assert class_ in image.classes, f"Model: {model_name} detected an extra class: {class_} in image {image['img_url']}"
             except Exception as e:
                 self.logger.error(e)
                 passed = False
@@ -84,7 +86,7 @@ class Test_IoU:
         model_name, model = model_tuple
 
         for img in images:
-            results = model.predict(img.img_url)
+            results = model.predict(img['img_url'])
 
             for index, result in enumerate(results):
                 boxes_object = result.boxes
@@ -101,14 +103,14 @@ class Test_IoU:
                 if not os.path.exists(output_folder):
                     os.makedirs(output_folder)
                 
-                output_path = os.path.join(output_folder, f'prediction_{img.img_url}_{index}.jpg')
+                output_path = os.path.join(output_folder, f"prediction_{img['img_url']}_{index}.jpg")
                 cv2.imwrite(output_path, img_with_boxes)
                 self.logger.info(f"Image saved to {output_path}")
 
             # her bounding box için yap
 
     def run(self):
-        for model in model_tuples:
+        for model in self.model_tuples:
             self.logger.info(f"Testing model: {model[0]}")
 
             self.logger.info("Testing class detection")
@@ -131,5 +133,5 @@ class Test_IoU:
 
 
 if __name__ == "__main__":
-    test = Test_IoU(model_tuples, images)
+    test = Test_IoU(get_model_tuples(model_weights), images)
     test.run()
