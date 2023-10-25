@@ -36,9 +36,6 @@ class Test_IoU:
                     time_result = end_time - start_time
   
                     iou_result = max([bbox_iou(img_box.to(dtype=float).unsqueeze(0), box.to(dtype=float).unsqueeze(0)) for img_box in img_boxes])
-                    print("-"*20)
-                    print(iou_result)
-
 
                     iou_results.append(float(iou_result))
                     time_results.append(float(time_result))
