@@ -1,0 +1,8 @@
+2023-10-25 10:26:04,703 - __main__ - INFO - This is an info message
+2023-10-25 10:26:04,703 - __main__ - ERROR - This is an error message
+[32m2023-10-25 10:27:18,300 - __main__ - INFO - This is an info message[0m
+[31m2023-10-25 10:27:18,301 - __main__ - ERROR - This is an error message[0m
+[32m2023-10-25 10:37:29,916 - __main__ - INFO - This is an info message[0m
+[31m2023-10-25 10:37:29,917 - __main__ - ERROR - This is an error message[0m
+[32m2023-10-25 10:37:33,978 - __main__ - INFO - This is an info message[0m
+[31m2023-10-25 10:37:33,979 - __main__ - ERROR - This is an error message[0m

@@ -3,3 +3,4 @@ myenv
 *.pt
 output_images/*
 main.py
+logs/*
