@@ -3,7 +3,6 @@ from termcolor import colored
 from datetime import datetime
 import os
 
-
 class ColoredFormatter(logging.Formatter):
     COLORS = {
         'WARNING': 'yellow',
@@ -67,9 +66,4 @@ def get_filename():
 
     return current_datetime_str + ".log"
 
-# Usage
-# log_file = 'app.log'
-# logger = setup_logger(log_file)
-# logger.info("This is an info message")
-# logger.error("This is an error message")
-# logger.debug("this  is a debug message")
+logging.getLogger('ultralytics').setLevel(logging.ERROR)

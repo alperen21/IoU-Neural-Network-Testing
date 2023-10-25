@@ -4,3 +4,4 @@ myenv
 output_images/*
 main.py
 logs/*
+*.log

@@ -1,6 +1,6 @@
 from ultralytics import YOLO
 from iou import bbox_iou, draw_predictions
-from input import models, images
+from input import model_tuples, images
 import statistics
 import time
 import os
@@ -9,12 +9,13 @@ from logger import setup_logger, get_filename
 
 
 class Test_IoU:
-    def __init__(self, models, images) -> None:
-        self.models = models
+    def __init__(self, model_tuples, images) -> None:
+        self.model_tuples = model_tuples
         self.images = images
         self.logger = setup_logger(os.path.join(".", "logs", get_filename()))
     
     def test_iou(self, model_tuple):
+        passed = True
         iou_results = [0]
         time_results = list()
 
@@ -38,16 +39,19 @@ class Test_IoU:
                     self.logger.info(f"{model_name}, {image.img_url}, iou: {iou_result}, time: {time_result}, box: {box}")
     
         self.logger.info("*"*20)
-        print("average results")
+        self.logger.info("average results")
         average_iou = statistics.mean(iou_results)
         average_time = statistics.mean(time_results)
 
         self.logger.info(f"Average time for {model_name} is {average_time}")
         self.logger.info(f"Average IoU for {model_name} is {average_iou}")
 
+        return passed
+
         
     
     def test_class(self, model_tuple):
+        passed = True
         model_name, model = model_tuple
 
         for image in images:
@@ -66,7 +70,9 @@ class Test_IoU:
                     assert class_ in image.classes, f"Model: {model_name} detected an extra class: {class_} in image {image.img_url}"
             except Exception as e:
                 self.logger.error(e)
-                raise e
+                passed = False
+
+        return passed
 
     def print_predictions(self, model_tuple):
         model_name, model = model_tuple
@@ -96,12 +102,28 @@ class Test_IoU:
             # her bounding box için yap
 
     def run(self):
-        for model in models:
-            self.test_class(model)
-            self.test_iou(model)
+        for model in model_tuples:
+            self.logger.info(f"Testing model: {model[0]}")
+
+            self.logger.info("Testing class detection")
+            result = self.test_class(model)
+            if result:
+                self.logger.info("Class detection test passed")
+            else:
+                self.logger.error("Class detection test failed")
+
+            self.logger.info("Testing IoU")
+            result = self.test_iou(model)
+            if result:
+                self.logger.info("IoU test passed")
+            else:
+                self.logger.error("IoU test failed")
+
+            self.logger.info("Printing predictions")
             self.print_predictions(model)
+            self.logger.info("Predictions printed")
 
 
 if __name__ == "__main__":
-    test = Test_IoU(models, images)
+    test = Test_IoU(model_tuples, images)
     test.run()

@@ -1,7 +1,7 @@
 from ultralytics import YOLO
 from iou import Image
 
-models = [(weights, YOLO(weights)) for weights in [
+model_tuples = [(weights, YOLO(weights)) for weights in [
     "yolov5s.pt",
 ]]
 
