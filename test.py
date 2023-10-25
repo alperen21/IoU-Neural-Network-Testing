@@ -5,6 +5,7 @@ from config import model_weights, images, iou_threshold
 import statistics
 from util.input import get_model_tuples
 import time
+import torch
 import os
 import cv2
 from logger.logger import setup_logger, get_filename
@@ -24,23 +25,25 @@ class Test_IoU:
         model_name, model = model_tuple
         
         for image in images:
-
+            img_boxes = [torch.tensor(img_box) for img_box in image["boxes"]]
             start_time = time.time()
             results = model.predict(image['img_url'])
             end_time = time.time()
 
             for result in results:
                 
-                for box in result.boxes.xyxy:
+                for box in result.boxes.xyxyn:
                     time_result = end_time - start_time
-                    iou_result = bbox_iou(box.unsqueeze(0), box.unsqueeze(0)).item()
-                    
+  
+                    iou_result = max([bbox_iou(img_box.to(dtype=float).unsqueeze(0), box.to(dtype=float).unsqueeze(0)) for img_box in img_boxes])
+                    print("-"*20)
+                    print(iou_result)
 
 
-                    iou_results.append(iou_result)
-                    time_results.append(time_result)
+                    iou_results.append(float(iou_result))
+                    time_results.append(float(time_result))
                     
-                    if iou_result > iou_threshold:
+                    if iou_result < iou_threshold:
                         passed = False
                         self.logger.error(f"{model_name}, {image['img_url']}, iou: {iou_result}, time: {time_result}, box: {box}")
                     else:
