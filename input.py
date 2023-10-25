@@ -12,3 +12,5 @@ images = [
             classes = ["bus", "person"]
         ),
 ]
+
+iou_threshold = 0.5

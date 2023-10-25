@@ -1,6 +1,6 @@
 from ultralytics import YOLO
 from iou import bbox_iou, draw_predictions
-from input import model_tuples, images
+from input import model_tuples, images, iou_threshold
 import statistics
 import time
 import os
@@ -33,10 +33,16 @@ class Test_IoU:
                     time_result = end_time - start_time
                     iou_result = bbox_iou(box.unsqueeze(0), box.unsqueeze(0)).item()
                     
+
+
                     iou_results.append(iou_result)
                     time_results.append(time_result)
                     
-                    self.logger.info(f"{model_name}, {image.img_url}, iou: {iou_result}, time: {time_result}, box: {box}")
+                    if iou_result > iou_threshold:
+                        passed = False
+                        self.logger.error(f"{model_name}, {image.img_url}, iou: {iou_result}, time: {time_result}, box: {box}")
+                    else:
+                        self.logger.info(f"{model_name}, {image.img_url}, iou: {iou_result}, time: {time_result}, box: {box}")
     
         self.logger.info("*"*20)
         self.logger.info("average results")
