@@ -62,7 +62,7 @@ def get_filename():
     current_datetime = datetime.now()
 
     # Convert to string format
-    current_datetime_str = current_datetime.strftime('%Y-%m-%d_%H:%M:%S')
+    current_datetime_str = current_datetime.strftime('%Y-%m-%d_%H-%M-%S')
 
     return current_datetime_str + ".log"
 
