@@ -71,11 +71,11 @@ class Test_IoU:
             class_names = [names[int(i)] for i in labels]
 
             try:
-                for class_ in image.classes:
+                for class_ in image["classes"]:
                     assert class_ in class_names, f"Model: {model_name} could not detect class: {class_} in image {image['img_url']}"
                 #yanlış index verirse falan hangisinin olduğunu yazdır, iou mu yanlış yoksa class mı yanlış differentiate
                 for class_ in class_names:
-                    assert class_ in image.classes, f"Model: {model_name} detected an extra class: {class_} in image {image['img_url']}"
+                    assert class_ in image["classes"], f"Model: {model_name} detected an extra class: {class_} in image {image['img_url']}"
             except Exception as e:
                 self.logger.error(e)
                 passed = False
