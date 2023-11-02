@@ -5,7 +5,7 @@ model_weights = [
 iou_threshold = 0.5
 images = [
     {
-        "img_url": "bus.jpg", 
+        "img_url": "test2.jpg", 
         "boxes": [
             [0.0607, 0.3732, 0.3028, 0.8375],
             [2.1884e-04, 5.0712e-01, 9.2044e-02, 8.0601e-01],
