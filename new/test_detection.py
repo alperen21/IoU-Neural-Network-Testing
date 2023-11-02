@@ -1,6 +1,7 @@
 from gather_input import gather_models, gather_images
 import os
 import torch
+from config import config
 
 def calculate_iou(box1, box2):
     # Make sure that the boxes are 1-D tensors
@@ -50,6 +51,7 @@ class TestDetection:
                     predicted_object_class = int(predicted_object_class)
                     max_iou = float('-inf')
                     true_class = -1
+                    true_object= None
 
                     for object in img_object.objects:
                         iou = calculate_iou(torch.tensor(object.bounding_box).reshape(-1), predicted_box.reshape(-1))
@@ -57,13 +59,22 @@ class TestDetection:
                         if iou > max_iou:
                             max_iou = iou
                             true_class = int(object.object_class)
+                            true_object = object
                     
-                    
+            
+
+                    if max_iou < config.threshold:
+                        print("iou test failed for:", true_object, "using model:", model_tuple)
+                    else:
+                        print("iou test passed for:", true_object, "using model:", model_tuple)
 
                     
-                    print("check")
-                    print("predicted class:", prediction.names[predicted_object_class], ", true class: ", prediction.names[true_class], "iou value:", max_iou)
-                    print("check")
+                    if true_class == predicted_object_class:
+                        print("class test passed for:", true_object, "using model:", model_tuple)
+                    else:
+                        print("class test failed for:", true_object, "using model:", model_tuple)
+
+
                     
 
                     
