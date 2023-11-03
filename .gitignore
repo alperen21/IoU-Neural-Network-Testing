@@ -5,3 +5,5 @@ output_images/*
 main.py
 logs/*
 *.log
+*png
+*jpg

@@ -5,6 +5,7 @@ from config import config
 import cv2
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
+from logger.logger import setup_logger, get_filename
 
 def calculate_iou(box1, box2):
     # Make sure that the boxes are 1-D tensors
@@ -33,17 +34,19 @@ def calculate_iou(box1, box2):
     return float(iou)
 
 class TestResultObject:
-    def __init__(self, objectClass, objectBoundingBox, correct_class, passed_iou_value) -> None:
+    def __init__(self, objectClass, objectBoundingBox, correct_class, passed_iou_value, original_image_url) -> None:
         self.objectClass = objectClass
         self.objectBoundingBox = objectBoundingBox
         self.correct_class = correct_class
         self.passed_iou_value = passed_iou_value
+        self.original_image_url = original_image_url
         
 
 class TestDetection:
     def __init__(self) -> None:
         self.img_objects = gather_images()
         self.model_tuples = gather_models()
+        self.logger = setup_logger(os.path.join("logs",get_filename()))
 
     def draw_bounding_boxes(self, image_path, test_result_objects):
         # Load the image
@@ -91,8 +94,7 @@ class TestDetection:
                 draw.text(text_position, label, fill='white', font=font)
 
             # Save or display the image
-            img.show()
-            img.save("annotated_image.png")
+            return img
 
 
 
@@ -102,11 +104,11 @@ class TestDetection:
         for model_tuple in self.model_tuples:
             model = model_tuple.model
             
-            print(f"testing: {model_tuple.model_weight_file}")
+            self.logger.info(f"testing: {model_tuple.model_weight_file}")
 
             for img_object in self.img_objects:
                 testResultObjects = list()
-                print(f"using: {img_object.img_url}")
+                self.logger.info(f"using: {img_object.img_url}")
 
                 prediction = model.predict(os.path.join(".", img_object.img_url))[0] #this is fine since we only give one image as input and not an array of images
                 predicted_object_classes = prediction.boxes.cls
@@ -129,20 +131,20 @@ class TestDetection:
             
                     passed_iou_value = None
                     if max_iou < config.threshold:
-                        print("iou test failed for:", true_object, "using model:", model_tuple)
+                        self.logger.error(f"iou test failed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}")
                         test_passed=False
                         passed_iou_value = False
                     else:
-                        print("iou test passed for:", true_object, "using model:", model_tuple)
+                        self.logger.info(f"iou test passed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}")
                         passed_iou_value = True
 
                     
                     correct_class = None
                     if true_class == predicted_object_class:
-                        print("class test passed for:", true_object, "using model:", model_tuple)
+                        self.logger.info(f"class test passed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}")
                         correct_class = True
                     else:
-                        print("class test failed for:", true_object, "using model:", model_tuple)
+                        self.logger.error(f"class test failed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}")
                         test_passed=False
                         correct_class = False
 
@@ -151,25 +153,27 @@ class TestDetection:
                                     objectClass = true_class, 
                                     objectBoundingBox = true_object.bounding_box,
                                     passed_iou_value = passed_iou_value,
-                                    correct_class = correct_class
+                                    correct_class = correct_class,
+                                    original_image_url=img_object.img_url
                                 )
                         )
 
-                self.draw_bounding_boxes(
+                
+                img = self.draw_bounding_boxes(
                     image_path = img_object.img_url,
-                    test_result_objects = testResultObjects
-                ) 
+                    test_result_objects = testResultObjects,
+                )
+
+                filepath, file_extension = os.path.splitext(img_object.img_url)
+                filename = filepath.split(os.sep)[-1]
+
+                img.save(os.path.join("output",filename+file_extension))
 
 
-                    
+                if test_passed:
+                    self.logger.info("test passed")
+                else:
+                    self.logger.error("test failed")
 
-                    
-
-
-                # print(box)
-                # print([prediction.names[int(elem)] for elem in object_class])
-
-
-
-
-TestDetection().test()
+if __name__ == "__main__":
+    TestDetection().test()
