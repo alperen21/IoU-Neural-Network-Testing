@@ -9,9 +9,11 @@ class Object:
         - Image class : int
         - Bounding box: list of floats (normalized coordinates) 
     """
-    def __init__(self, object_class : int, bounding_box : list[float]):
+    def __init__(self, object_class : int, bounding_box : list[float], correct_classification = False, passed_iou_threshold = False):
         self.object_class = object_class
         self.bounding_box = bounding_box
+        self.correct_classification = correct_classification
+        self.passed_iou_threshold = passed_iou_threshold
     
     def __repr__(self) -> str:
         return f"""

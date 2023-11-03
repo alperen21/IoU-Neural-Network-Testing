@@ -31,16 +31,7 @@ def calculate_iou(box1, box2):
     # Calculate IoU
     iou = intersection_area / union_area
 
-    return float(iou)
-
-class TestResultObject:
-    def __init__(self, objectClass, objectBoundingBox, correct_class, passed_iou_value, original_image_url) -> None:
-        self.objectClass = objectClass
-        self.objectBoundingBox = objectBoundingBox
-        self.correct_class = correct_class
-        self.passed_iou_value = passed_iou_value
-        self.original_image_url = original_image_url
-        
+    return float(iou)        
 
 class TestDetection:
     def __init__(self) -> None:
@@ -48,54 +39,74 @@ class TestDetection:
         self.model_tuples = gather_models()
         self.logger = setup_logger(os.path.join("logs",get_filename()))
 
-    def draw_bounding_boxes(self, image_path, test_result_objects):
-        # Load the image
-        with Image.open(image_path) as img:
-            draw = ImageDraw.Draw(img)
-            img_width, img_height = img.size
+    def draw_bounding_boxes(self, image_path, objects):
+        # Read the image
+        img = cv2.imread(image_path)
+        
+        if img is None:
+            print("Error: The image could not be read.")
+            return None
 
-            # Load a font
-            font = ImageFont.load_default()
+        img_height, img_width = img.shape[:2]
 
-            for obj in test_result_objects:
-                message = ""
-                # Convert normalized coordinates to absolute coordinates
-                x1, y1, x2, y2 = obj.objectBoundingBox
-                abs_box = [
-                    x1 * img_width,
-                    y1 * img_height,
-                    x2 * img_width,
-                    y2 * img_height,
-                ]
+        # Define the font for the text
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.5
+        font_thickness = 1
 
-                # Determine color based on the flags
-                color = 'green'
-                if not obj.passed_iou_value:
-                    color = 'yellow'
-                    message += "iou "
+        for obj in objects:
+            message = ""
 
-                if not obj.correct_class:
-                    color = 'red'
-                    message += "class "
-                # Draw the bounding box
-                draw.rectangle(abs_box, outline=color, width=2)
+            # Convert normalized coordinates to absolute coordinates and apply a small adjustment
+            x_min, y_min, box_width, box_height = obj.bounding_box
+            x_min_abs = int((x_min * img_width) - 5)  # add 0.5 for rounding
+            y_min_abs = int((y_min * img_height) - 5) # add 0.5 for rounding
+            box_width_abs = int((box_width * img_width) - 5) 
+            box_height_abs = int((box_height * img_height) - 5)
 
-                # Draw label
-                label = f"{obj.objectClass} {message}" 
-                # Approximate the text size based on the length of the label and font size
-                font_size = 12  # Assuming a default font size
-                text_length = len(label) * font_size
-                text_height = font_size  # Approximate height for most fonts
-                text_position = (abs_box[0], abs_box[1] - text_height)
+            # Calculate the bottom right corner from the top left corner and width and height
+            x_max_abs = x_min_abs + box_width_abs
+            y_max_abs = y_min_abs + box_height_abs
 
-                # Draw a filled rectangle behind the text for better visibility
-                draw.rectangle((text_position[0], text_position[1], text_position[0] + text_length, text_position[1] + text_height), fill=color)
-                # Draw the text on top of the filled rectangle
-                draw.text(text_position, label, fill='white', font=font)
+            # Correction for potential offset
+            offset_correction = 1  # You might need to adjust this value
+            x_max_abs -= offset_correction
+            y_max_abs -= offset_correction
 
-            # Save or display the image
-            return img
+            # Determine color based on the flags
+            color = (0, 255, 0)  # Green
+            if not obj.passed_iou_threshold:
+                color = (0, 255, 255)  # Yellow
+                message += "iou "
+            if not obj.correct_classification:
+                color = (0, 0, 255)  # Red
+                message += "class "
 
+            # Draw the bounding box
+            cv2.rectangle(img, (x_min_abs, y_min_abs), (x_max_abs, y_max_abs), color, 2)
+
+            # Draw label
+            label = f"{obj.object_class} {message}".strip()
+
+            # Get the width and height of the text box
+            text_size = cv2.getTextSize(label, font, font_scale, font_thickness)[0]
+            text_width, text_height = text_size
+            text_x1, text_y1 = x_min_abs, y_min_abs - 10
+
+            # Draw a filled rectangle behind the text for better visibility
+            cv2.rectangle(img, (text_x1, text_y1 - text_height - 5), (text_x1 + text_width, text_y1), color, cv2.FILLED)
+
+            # Draw the text on top of the filled rectangle
+            cv2.putText(img, label, (text_x1, text_y1 - 5), font, font_scale, (255, 255, 255), font_thickness)
+
+        # Show the image
+        # cv2.imshow('Image with Bounding Boxes', img)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
+
+        # Save or return the image if you need
+        # cv2.imwrite('output_image_path.jpg', img)
+        return img
 
 
     
@@ -107,7 +118,6 @@ class TestDetection:
             self.logger.info(f"testing: {model_tuple.model_weight_file}")
 
             for img_object in self.img_objects:
-                testResultObjects = list()
                 self.logger.info(f"using: {img_object.img_url}")
 
                 prediction = model.predict(os.path.join(".", img_object.img_url))[0] #this is fine since we only give one image as input and not an array of images
@@ -129,46 +139,36 @@ class TestDetection:
                             true_object = object
                     
             
-                    passed_iou_value = None
+                    passed_iou_threshold = None
                     if max_iou < config.threshold:
                         self.logger.error(f"iou test failed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}")
                         test_passed=False
-                        passed_iou_value = False
+                        passed_iou_threshold = False
                     else:
                         self.logger.info(f"iou test passed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}")
-                        passed_iou_value = True
+                        passed_iou_threshold = True
 
                     
-                    correct_class = None
+                    correct_classification = None
                     if true_class == predicted_object_class:
                         self.logger.info(f"class test passed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}")
-                        correct_class = True
+                        correct_classification = True
                     else:
                         self.logger.error(f"class test failed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}")
                         test_passed=False
-                        correct_class = False
-
-                    testResultObjects.append(
-                            TestResultObject(
-                                    objectClass = true_class, 
-                                    objectBoundingBox = true_object.bounding_box,
-                                    passed_iou_value = passed_iou_value,
-                                    correct_class = correct_class,
-                                    original_image_url=img_object.img_url
-                                )
-                        )
+                        correct_classification = False
 
                 
                 img = self.draw_bounding_boxes(
                     image_path = img_object.img_url,
-                    test_result_objects = testResultObjects,
+                    objects = img_object.objects,
                 )
 
                 filepath, file_extension = os.path.splitext(img_object.img_url)
                 filename = filepath.split(os.sep)[-1]
 
-                img.save(os.path.join("output",filename+file_extension))
-
+                # img.save(os.path.join("output",filename+file_extension))
+                cv2.imwrite(os.path.join("output",filename+file_extension), img)
 
                 if test_passed:
                     self.logger.info("test passed")
