@@ -7,31 +7,48 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 from logger.logger import setup_logger, get_filename
 
-def calculate_iou(box1, box2):
-    # Make sure that the boxes are 1-D tensors
-    assert box1.dim() == 1 and box2.dim() == 1, "Box tensors must be 1-D"
-    assert box1.numel() == 4 and box2.numel() == 4, "Box tensors must have 4 elements"
-
-    # Calculate intersection
-    x_left = max(box1[0], box2[0]).item()
-    y_top = max(box1[1], box2[1]).item()
-    x_right = min(box1[2], box2[2]).item()
-    y_bottom = min(box1[3], box2[3]).item()
-
-    if x_right < x_left or y_bottom < y_top:
-        return 0.0  # No overlap
-
-    intersection_area = (x_right - x_left) * (y_bottom - y_top)
-
-    # Calculate union
-    box1_area = (box1[2] - box1[0]) * (box1[3] - box1[1])
-    box2_area = (box2[2] - box2[0]) * (box2[3] - box2[1])
-    union_area = box1_area + box2_area - intersection_area
-
-    # Calculate IoU
-    iou = intersection_area / union_area
-
-    return float(iou)        
+def calculate_iou(box1, box2, x1y1x2y2=False, GIoU=False, DIoU=False, CIoU=False, eps=1e-9): 
+     # Returns the IoU of box1 to box2. box1 is 4, box2 is nx4 
+    box2 = box2.T 
+  
+     # Get the coordinates of bounding boxes 
+    if x1y1x2y2:  # x1, y1, x2, y2 = box1 
+        b1_x1, b1_y1, b1_x2, b1_y2 = box1[0], box1[1], box1[2], box1[3] 
+        b2_x1, b2_y1, b2_x2, b2_y2 = box2[0], box2[1], box2[2], box2[3] 
+    else:  # transform from xywh to xyxy 
+        b1_x1, b1_x2 = box1[0] - box1[2] / 2, box1[0] + box1[2] / 2 
+        b1_y1, b1_y2 = box1[1] - box1[3] / 2, box1[1] + box1[3] / 2 
+        b2_x1, b2_x2 = box2[0] - box2[2] / 2, box2[0] + box2[2] / 2 
+        b2_y1, b2_y2 = box2[1] - box2[3] / 2, box2[1] + box2[3] / 2 
+  
+     # Intersection area 
+    inter = (torch.min(b1_x2, b2_x2) - torch.max(b1_x1, b2_x1)).clamp(0) * (torch.min(b1_y2, b2_y2) - torch.max(b1_y1, b2_y1)).clamp(0) 
+  
+     # Union Area 
+    w1, h1 = b1_x2 - b1_x1, b1_y2 - b1_y1 + eps 
+    w2, h2 = b2_x2 - b2_x1, b2_y2 - b2_y1 + eps 
+    union = w1 * h1 + w2 * h2 - inter + eps 
+  
+    iou = inter / union 
+    if GIoU or DIoU or CIoU: 
+        cw = torch.max(b1_x2, b2_x2) - torch.min(b1_x1, b2_x1)  # convex (smallest enclosing box) width 
+        ch = torch.max(b1_y2, b2_y2) - torch.min(b1_y1, b2_y1)  # convex height 
+        if CIoU or DIoU:  # Distance or Complete IoU https://arxiv.org/abs/1911.08287v1 
+            c2 = cw ** 2 + ch ** 2 + eps  # convex diagonal squared 
+            rho2 = ((b2_x1 + b2_x2 - b1_x1 - b1_x2) ** 2 + 
+                     (b2_y1 + b2_y2 - b1_y1 - b1_y2) ** 2) / 4  # center distance squared 
+            if DIoU: 
+                return iou - rho2 / c2  # DIoU 
+            elif CIoU:  # https://github.com/Zzh-tju/DIoU-SSD-pytorch/blob/master/utils/box/box_utils.py#L47 
+                v = (4 / math.pi ** 2) * torch.pow(torch.atan(w2 / h2) - torch.atan(w1 / h1), 2) 
+                with torch.no_grad(): 
+                    alpha = v / ((1 + eps) - iou + v) 
+                return iou - (rho2 / c2 + v * alpha)  # CIoU 
+        else:  # GIoU https://arxiv.org/pdf/1902.09630.pdf 
+            c_area = cw * ch + eps  # convex area 
+            return iou - (c_area - union) / c_area  # GIoU 
+    else: 
+        return iou  # IoU 
 
 class TestDetection:
     def __init__(self) -> None:
@@ -132,7 +149,6 @@ class TestDetection:
 
                     for object in img_object.objects:
                         iou = calculate_iou(torch.tensor(object.bounding_box).reshape(-1), predicted_box.reshape(-1))
-                        
                         if iou > max_iou:
                             max_iou = iou
                             true_class = int(object.object_class)
@@ -141,20 +157,20 @@ class TestDetection:
             
                     passed_iou_threshold = None
                     if max_iou < config.threshold:
-                        self.logger.error(f"iou test failed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}")
+                        self.logger.error(f"iou test failed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, iou: {max_iou}")
                         test_passed=False
                         passed_iou_threshold = False
                     else:
-                        self.logger.info(f"iou test passed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}")
+                        self.logger.info(f"iou test passed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, iou: {max_iou}")
                         passed_iou_threshold = True
 
                     
                     correct_classification = None
                     if true_class == predicted_object_class:
-                        self.logger.info(f"class test passed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}")
+                        self.logger.info(f"class test passed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, predicted: {predicted_object_class}, true: {true_class} ")
                         correct_classification = True
                     else:
-                        self.logger.error(f"class test failed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}")
+                        self.logger.error(f"class test failed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, predicted: {predicted_object_class}, true: {true_class} ")
                         test_passed=False
                         correct_classification = False
 
