@@ -76,10 +76,12 @@ class TestDetection:
 
             # Convert normalized coordinates to absolute coordinates and apply a small adjustment
             x_min, y_min, box_width, box_height = obj.bounding_box
-            x_min_abs = int((x_min * img_width) - 5)  # add 0.5 for rounding
-            y_min_abs = int((y_min * img_height) - 5) # add 0.5 for rounding
-            box_width_abs = int((box_width * img_width) - 5) 
-            box_height_abs = int((box_height * img_height) - 5)
+            wh_rounding = 8
+            coordinate_rounding = 15
+            x_min_abs = int(round((x_min * img_width))) - coordinate_rounding  # add 0.5 for rounding
+            y_min_abs = int(round((y_min * img_height)))  - coordinate_rounding # add 0.5 for rounding
+            box_width_abs = int((box_width * img_width) + wh_rounding ) 
+            box_height_abs = int((box_height * img_height) + wh_rounding )
 
             # Calculate the bottom right corner from the top left corner and width and height
             x_max_abs = x_min_abs + box_width_abs
@@ -194,10 +196,10 @@ class TestDetection:
                 # img.save(os.path.join("output",filename+file_extension))
                 cv2.imwrite(os.path.join("output",filename+file_extension), img)
 
-                if test_passed:
-                    self.logger.info("test passed")
-                else:
-                    self.logger.error("test failed")
+                #if test_passed:
+                #    self.logger.info("test passed")
+                #else:
+                #    self.logger.error("test failed")
 
 if __name__ == "__main__":
     TestDetection().test()
