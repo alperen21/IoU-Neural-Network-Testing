@@ -56,7 +56,7 @@ class TestDetection:
         self.model_tuples = gather_models()
         self.logger = setup_logger(os.path.join("logs",get_filename()))
 
-    def draw_bounding_boxes(self, image_path, objects):
+    def draw_bounding_boxes(self, image_path, objects, names):
         # Read the image
         img = cv2.imread(image_path)
         
@@ -101,9 +101,11 @@ class TestDetection:
 
             # Draw the bounding box
             cv2.rectangle(img, (x_min_abs, y_min_abs), (x_max_abs, y_max_abs), color, 2)
-
+            
+            object_class = int(obj.object_class)
+            object_class_name = names[object_class]
             # Draw label
-            label = f"{obj.object_class} {message}".strip()
+            label = f"{object_class_name} {message}".strip()
 
             # Get the width and height of the text box
             text_size = cv2.getTextSize(label, font, font_scale, font_thickness)[0]
@@ -163,22 +165,28 @@ class TestDetection:
                     else:
                         self.logger.info(f"iou test passed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, iou: {max_iou}")
                         passed_iou_threshold = True
+                        true_object.passed_iou_threshold = True
 
                     
                     correct_classification = None
                     if true_class == predicted_object_class:
                         self.logger.info(f"class test passed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, predicted: {predicted_object_class}, true: {true_class} ")
                         correct_classification = True
+                        true_object.correct_classification = True
                     else:
                         self.logger.error(f"class test failed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, predicted: {predicted_object_class}, true: {true_class} ")
                         test_passed=False
                         correct_classification = False
 
                 
+                names = prediction.names
                 img = self.draw_bounding_boxes(
                     image_path = img_object.img_url,
                     objects = img_object.objects,
+                    names = names
                 )
+
+              
 
                 filepath, file_extension = os.path.splitext(img_object.img_url)
                 filename = filepath.split(os.sep)[-1]
