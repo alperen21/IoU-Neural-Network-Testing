@@ -151,7 +151,7 @@ class TestDetection:
 
                     for object in img_object.objects:
                         iou = calculate_iou(torch.tensor(object.bounding_box).reshape(-1), predicted_box.reshape(-1))
-                        if iou > max_iou:
+                        if iou >= max_iou:
                             max_iou = iou
                             true_class = int(object.object_class)
                             true_object = object
