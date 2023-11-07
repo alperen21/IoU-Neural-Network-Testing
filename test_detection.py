@@ -151,6 +151,11 @@ class TestDetection:
                     true_class = -1
                     true_object= None
 
+                    if len(img_object.objects) == 0:
+                        self.logger.error(f"no objects found in image: {img_object.img_url}")
+                        test_passed=False
+                        continue
+
                     for object in img_object.objects:
                         iou = calculate_iou(torch.tensor(object.bounding_box).reshape(-1), predicted_box.reshape(-1))
                         if iou >= max_iou:
@@ -158,7 +163,6 @@ class TestDetection:
                             true_class = int(object.object_class)
                             true_object = object
                     
-            
                     passed_iou_threshold = None
                     if max_iou < config.threshold:
                         self.logger.error(f"iou test failed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, iou: {max_iou}")
