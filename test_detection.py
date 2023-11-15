@@ -101,24 +101,25 @@ class TestDetection:
                 color = (0, 0, 255)  # Red
                 message += "class "
 
-            # Draw the bounding box
-            cv2.rectangle(img, (x_min_abs, y_min_abs), (x_max_abs, y_max_abs), color, 2)
-            
-            object_class = int(obj.object_class)
-            object_class_name = names[object_class]
-            # Draw label
-            label = f"{object_class_name} {message}".strip()
+            if color != (0, 255, 0):
+                # Draw the bounding box
+                cv2.rectangle(img, (x_min_abs, y_min_abs), (x_max_abs, y_max_abs), color, 2)
+                
+                object_class = int(obj.object_class)
+                object_class_name = names[object_class]
+                # Draw label
+                label = f"{object_class_name} {message}".strip()
 
-            # Get the width and height of the text box
-            text_size = cv2.getTextSize(label, font, font_scale, font_thickness)[0]
-            text_width, text_height = text_size
-            text_x1, text_y1 = x_min_abs, y_min_abs - 10
+                # Get the width and height of the text box
+                text_size = cv2.getTextSize(label, font, font_scale, font_thickness)[0]
+                text_width, text_height = text_size
+                text_x1, text_y1 = x_min_abs, y_min_abs - 10
 
-            # Draw a filled rectangle behind the text for better visibility
-            cv2.rectangle(img, (text_x1, text_y1 - text_height - 5), (text_x1 + text_width, text_y1), color, cv2.FILLED)
+                # Draw a filled rectangle behind the text for better visibility
+                cv2.rectangle(img, (text_x1, text_y1 - text_height - 5), (text_x1 + text_width, text_y1), color, cv2.FILLED)
 
-            # Draw the text on top of the filled rectangle
-            cv2.putText(img, label, (text_x1, text_y1 - 5), font, font_scale, (255, 255, 255), font_thickness)
+                # Draw the text on top of the filled rectangle
+                cv2.putText(img, label, (text_x1, text_y1 - 5), font, font_scale, (255, 255, 255), font_thickness)
 
         # Show the image
         # cv2.imshow('Image with Bounding Boxes', img)
@@ -127,7 +128,10 @@ class TestDetection:
 
         # Save or return the image if you need
         # cv2.imwrite('output_image_path.jpg', img)
-        return img
+        img_original = cv2.imread(image_path)
+        combined_image = cv2.hconcat([img_original, img])
+
+        return combined_image
 
 
     
