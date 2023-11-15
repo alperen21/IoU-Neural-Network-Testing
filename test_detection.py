@@ -56,6 +56,10 @@ class TestDetection:
         self.model_tuples = gather_models()
         self.logger = setup_logger(os.path.join("logs",get_filename()))
 
+        
+        if not os.path.exists(os.path.join(".", "output")):
+            os.makedirs(os.path.join(".", "output"))
+
     def draw_bounding_boxes(self, image_path, objects, names):
         # Read the image
         img = cv2.imread(image_path)
