@@ -94,6 +94,9 @@ class TestDetection:
 
             # Determine color based on the flags
             color = (0, 255, 0)  # Green
+
+            object_class = int(obj.object_class)
+            object_class_name = names[object_class]
             if not obj.passed_iou_threshold:
                 color = (0, 255, 255)  # Yellow
                 message += "iou "
@@ -105,8 +108,6 @@ class TestDetection:
                 # Draw the bounding box
                 cv2.rectangle(img, (x_min_abs, y_min_abs), (x_max_abs, y_max_abs), color, 2)
                 
-                object_class = int(obj.object_class)
-                object_class_name = names[object_class]
                 # Draw label
                 label = f"{object_class_name} {message}".strip()
 
