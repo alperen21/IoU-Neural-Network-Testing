@@ -2,6 +2,7 @@ import cv2
 import os
 from config import config
 from ultralytics import YOLO
+import pathlib
 
 class Object:
     """
@@ -96,6 +97,64 @@ def gather_images():
 
     return img_objects
 
+def delete_files_in_directory(directory_path):
+    """
+    Deletes all files in the specified directory.
+
+    Args:
+    directory_path (str): The path to the directory from which to delete files.
+    """
+    # Convert the directory path to a pathlib Path object for easy manipulation
+    dir_path = pathlib.Path(directory_path)
+
+    # Check if the directory exists
+    if not dir_path.is_dir():
+        print(f"The directory {directory_path} does not exist.")
+        return
+
+    # Iterate over each item in the directory
+    for item in dir_path.iterdir():
+        # Check if the item is a file and delete it
+        if item.is_file():
+            try:
+                item.unlink()  # unlink is a method to delete files
+                print(f"Deleted file: {item}")
+            except Exception as e:
+                print(f"Error deleting file {item}: {e}")
+
+def delete_specific_files(directory_path, prefix):
+    """
+    Deletes all files with a specific prefix in the specified directory and its subdirectories.
+
+    Args:
+    directory_path (str): The path to the directory to search.
+    prefix (str): The prefix of the files to be deleted.
+    """
+    # Convert the directory path to a pathlib Path object for easy manipulation
+    dir_path = pathlib.Path(directory_path)
+
+    # Check if the directory exists
+    if not dir_path.is_dir():
+        print(f"The directory {directory_path} does not exist.")
+        return
+
+    # Walk through all directories and files
+    for root, dirs, files in os.walk(directory_path):
+        for file in files:
+            if file.startswith(prefix):
+                file_path = pathlib.Path(root) / file
+                try:
+                    file_path.unlink()  # Delete the file
+                    print(f"Deleted file: {file_path}")
+                except Exception as e:
+                    print(f"Error deleting file {file_path}: {e}")
+
+
+def clean():
+    print("cleaning up...")
+    delete_files_in_directory("output")
+    delete_specific_files('.', '._')
+
 
 def gather_models():
     model_tuples = list()
@@ -104,7 +163,8 @@ def gather_models():
 
     for root, _, files in os.walk("models"):
         for file in files:
-            weights.append(os.path.join(root, file))
+            if file.endswith(".pt"):
+                weights.append(os.path.join(root, file))
     
     for weight in weights:
         models.append(YOLO(weight))
@@ -120,8 +180,7 @@ def gather_models():
     return model_tuples
     
 def main():
-    print(gather_images())
-    print(gather_models())
+    clean()
 
 
 if __name__ == "__main__":

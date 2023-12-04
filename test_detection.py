@@ -1,4 +1,4 @@
-from gather_input import gather_models, gather_images
+from gather_input import gather_models, gather_images, delete_files_in_directory, delete_specific_files
 import os
 import torch
 from config import config
@@ -10,7 +10,6 @@ from logger.logger import setup_logger, get_filename
 def calculate_iou(box1, box2, x1y1x2y2=False, GIoU=False, DIoU=False, CIoU=False, eps=1e-9): 
      # Returns the IoU of box1 to box2. box1 is 4, box2 is nx4 
     box2 = box2.T 
-  
      # Get the coordinates of bounding boxes 
     if x1y1x2y2:  # x1, y1, x2, y2 = box1 
         b1_x1, b1_y1, b1_x2, b1_y2 = box1[0], box1[1], box1[2], box1[3] 
@@ -50,12 +49,14 @@ def calculate_iou(box1, box2, x1y1x2y2=False, GIoU=False, DIoU=False, CIoU=False
     else: 
         return iou  # IoU 
 
+
 class TestDetection:
     def __init__(self) -> None:
+        self.logger = setup_logger(os.path.join("logs",get_filename()))
+        self.logger.info("deleting files from the previous test in output directory")
+        delete_files_in_directory("output")
         self.img_objects = gather_images()
         self.model_tuples = gather_models()
-        self.logger = setup_logger(os.path.join("logs",get_filename()))
-
         
         if not os.path.exists(os.path.join(".", "output")):
             os.makedirs(os.path.join(".", "output"))
@@ -213,6 +214,11 @@ class TestDetection:
                 #    self.logger.info("test passed")
                 #else:
                 #    self.logger.error("test failed")
+    def clean(self):
+        self.logger.info("cleaning up...")
+        delete_specific_files('.', '._')
 
 if __name__ == "__main__":
-    TestDetection().test()
+    testObject = TestDetection()
+    testObject.test()
+    testObject.clean()
