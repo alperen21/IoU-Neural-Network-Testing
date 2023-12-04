@@ -6,6 +6,9 @@ import cv2
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 from logger.logger import setup_logger, get_filename
+from multiprocessing import Pool
+
+PARALLEL = True
 
 def calculate_iou(box1, box2, x1y1x2y2=False, GIoU=False, DIoU=False, CIoU=False, eps=1e-9): 
      # Returns the IoU of box1 to box2. box1 is 4, box2 is nx4 
@@ -139,7 +142,69 @@ class TestDetection:
 
         return combined_image
 
+    def test_img_parallel(self, arguments):
+        img_object, model_tuple = arguments
+        self.test_img(img_object, model_tuple)
 
+
+    def test_img(self, img_object, model_tuple):
+        model = model_tuple.model
+        self.logger.info(f"using: {img_object.img_url}")
+
+        prediction = model.predict(os.path.join(".", img_object.img_url))[0] #this is fine since we only give one image as input and not an array of images
+        predicted_object_classes = prediction.boxes.cls
+        predicted_boxes = prediction.boxes.xyxyn
+
+        for predicted_object_class, predicted_box in zip(predicted_object_classes, predicted_boxes):
+            predicted_object_class = int(predicted_object_class)
+            max_iou = float('-inf')
+            true_class = -1
+            true_object= None
+
+            if len(img_object.objects) == 0:
+                self.logger.error(f"no objects found in image: {img_object.img_url}")
+                test_passed=False
+                continue
+
+            for object in img_object.objects:
+                iou = calculate_iou(torch.tensor(object.bounding_box).reshape(-1), predicted_box.reshape(-1))
+                if iou >= max_iou:
+                    max_iou = iou
+                    true_class = int(object.object_class)
+                    true_object = object
+            
+            passed_iou_threshold = None
+            if max_iou < config.threshold:
+                self.logger.error(f"iou test failed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, iou: {max_iou}")
+                test_passed=False
+                passed_iou_threshold = False
+            else:
+                self.logger.info(f"iou test passed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, iou: {max_iou}")
+                passed_iou_threshold = True
+                true_object.passed_iou_threshold = True
+
+            
+            correct_classification = None
+            if true_class == predicted_object_class:
+                self.logger.info(f"class test passed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, predicted: {predicted_object_class}, true: {true_class} ")
+                correct_classification = True
+                true_object.correct_classification = True
+            else:
+                self.logger.error(f"class test failed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, predicted: {predicted_object_class}, true: {true_class} ")
+                test_passed=False
+                correct_classification = False
+
+        
+        names = prediction.names
+        img = self.draw_bounding_boxes(
+            image_path = img_object.img_url,
+            objects = img_object.objects,
+            names = names
+        )
+
+        filepath, file_extension = os.path.splitext(img_object.img_url)
+        filename = filepath.split(os.sep)[-1]
+        cv2.imwrite(os.path.join("output",filename+file_extension), img)
     
     def test(self):
         test_passed = True
@@ -148,72 +213,13 @@ class TestDetection:
             
             self.logger.info(f"testing: {model_tuple.model_weight_file}")
 
-            for img_object in self.img_objects:
-                self.logger.info(f"using: {img_object.img_url}")
-
-                prediction = model.predict(os.path.join(".", img_object.img_url))[0] #this is fine since we only give one image as input and not an array of images
-                predicted_object_classes = prediction.boxes.cls
-                predicted_boxes = prediction.boxes.xyxyn
-
-                for predicted_object_class, predicted_box in zip(predicted_object_classes, predicted_boxes):
-                    predicted_object_class = int(predicted_object_class)
-                    max_iou = float('-inf')
-                    true_class = -1
-                    true_object= None
-
-                    if len(img_object.objects) == 0:
-                        self.logger.error(f"no objects found in image: {img_object.img_url}")
-                        test_passed=False
-                        continue
-
-                    for object in img_object.objects:
-                        iou = calculate_iou(torch.tensor(object.bounding_box).reshape(-1), predicted_box.reshape(-1))
-                        if iou >= max_iou:
-                            max_iou = iou
-                            true_class = int(object.object_class)
-                            true_object = object
-                    
-                    passed_iou_threshold = None
-                    if max_iou < config.threshold:
-                        self.logger.error(f"iou test failed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, iou: {max_iou}")
-                        test_passed=False
-                        passed_iou_threshold = False
-                    else:
-                        self.logger.info(f"iou test passed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, iou: {max_iou}")
-                        passed_iou_threshold = True
-                        true_object.passed_iou_threshold = True
-
-                    
-                    correct_classification = None
-                    if true_class == predicted_object_class:
-                        self.logger.info(f"class test passed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, predicted: {predicted_object_class}, true: {true_class} ")
-                        correct_classification = True
-                        true_object.correct_classification = True
-                    else:
-                        self.logger.error(f"class test failed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, predicted: {predicted_object_class}, true: {true_class} ")
-                        test_passed=False
-                        correct_classification = False
-
+            if PARALLEL:
+                with Pool(os.cpu_count()) as p:
+                    p.map(self.test_img_parallel, [(img_object, model_tuple) for img_object in self.img_objects])
+            else:
+                for img_object in self.img_objects:
+                    self.test_img(img_object, model_tuple)
                 
-                names = prediction.names
-                img = self.draw_bounding_boxes(
-                    image_path = img_object.img_url,
-                    objects = img_object.objects,
-                    names = names
-                )
-
-              
-
-                filepath, file_extension = os.path.splitext(img_object.img_url)
-                filename = filepath.split(os.sep)[-1]
-
-                # img.save(os.path.join("output",filename+file_extension))
-                cv2.imwrite(os.path.join("output",filename+file_extension), img)
-
-                #if test_passed:
-                #    self.logger.info("test passed")
-                #else:
-                #    self.logger.error("test failed")
     def clean(self):
         self.logger.info("cleaning up...")
         delete_specific_files('.', '._')
