@@ -60,9 +60,28 @@ class TestDetection:
         delete_files_in_directory("output")
         self.img_objects = gather_images()
         self.model_tuples = gather_models()
+
+        self.passed_class_count = 0
+        self.failed_class_count = 0
+        self.passed_iou_count = 0
+        self.failed_iou_count = 0
+
         
         if not os.path.exists(os.path.join(".", "output")):
             os.makedirs(os.path.join(".", "output"))
+
+    def draw_square(self, img, label, index, x, y, w, h, thickness=1):
+        color_map = {
+            '0': (0, 0, 255),
+            '1': (255, 0, 0),
+            '2': (0, 255, 0),
+            # Additional labels can be added here if necessary
+        }
+        color = color_map.get(label, (255, 0, 0))  # Default color is white
+
+        cv2.rectangle(img, (x, y), (x + w, y + h), color, thickness)
+        cv2.putText(img, str(index), (x + w, y + h), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+
 
     def draw_bounding_boxes(self, image_path, objects, names):
         # Read the image
@@ -79,57 +98,23 @@ class TestDetection:
         font_scale = 0.5
         font_thickness = 1
 
+        h,w,c = img.shape
         for obj in objects:
             message = ""
 
             # Convert normalized coordinates to absolute coordinates and apply a small adjustment
-            x_min, y_min, box_width, box_height = obj.bounding_box
-            wh_rounding = 8
-            coordinate_rounding = 15
-            x_min_abs = int(round((x_min * img_width))) - coordinate_rounding  # add 0.5 for rounding
-            y_min_abs = int(round((y_min * img_height)))  - coordinate_rounding # add 0.5 for rounding
-            box_width_abs = int((box_width * img_width) + wh_rounding ) 
-            box_height_abs = int((box_height * img_height) + wh_rounding )
+            p0,p1,p2,p3 = obj.bounding_box
 
-            # Calculate the bottom right corner from the top left corner and width and height
-            x_max_abs = x_min_abs + box_width_abs
-            y_max_abs = y_min_abs + box_height_abs
+            x_max = int((w / 2) * (2 * p0 + p2))
+            y_max = int((h / 2) * (2 * p1 + p3))
+            w_box = int(p2 * w)
+            h_box = int(p3 * h)
+            x_min = int(x_max - w_box)
+            y_min = int(y_max - h_box)
 
-            # Correction for potential offset
-            offset_correction = 1  # You might need to adjust this value
-            x_max_abs -= offset_correction
-            y_max_abs -= offset_correction
+            self.draw_square(img, "label", 1, x_min, y_min, w_box, h_box, thickness=1)
 
-            # Determine color based on the flags
-            color = (0, 255, 0)  # Green
-
-            object_class = int(obj.object_class)
-            object_class_name = names[object_class]
-            if not obj.passed_iou_threshold:
-                color = (0, 255, 255)  # Yellow
-                message += "iou "
-            if not obj.correct_classification:
-                color = (0, 0, 255)  # Red
-                message += "class "
-
-            if color != (0, 255, 0):
-                # Draw the bounding box
-                cv2.rectangle(img, (x_min_abs, y_min_abs), (x_max_abs, y_max_abs), color, 2)
-                
-                # Draw label
-                label = f"{object_class_name} {message}".strip()
-
-                # Get the width and height of the text box
-                text_size = cv2.getTextSize(label, font, font_scale, font_thickness)[0]
-                text_width, text_height = text_size
-                text_x1, text_y1 = x_min_abs, y_min_abs - 10
-
-                # Draw a filled rectangle behind the text for better visibility
-                cv2.rectangle(img, (text_x1, text_y1 - text_height - 5), (text_x1 + text_width, text_y1), color, cv2.FILLED)
-
-                # Draw the text on top of the filled rectangle
-                cv2.putText(img, label, (text_x1, text_y1 - 5), font, font_scale, (255, 255, 255), font_thickness)
-
+            
         # Show the image
         # cv2.imshow('Image with Bounding Boxes', img)
         # cv2.waitKey(0)
@@ -144,7 +129,7 @@ class TestDetection:
 
     def test_img_parallel(self, arguments):
         img_object, model_tuple = arguments
-        self.test_img(img_object, model_tuple)
+        return self.test_img(img_object, model_tuple)
 
 
     def test_img(self, img_object, model_tuple):
@@ -178,10 +163,12 @@ class TestDetection:
                 self.logger.error(f"iou test failed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, iou: {max_iou}")
                 test_passed=False
                 passed_iou_threshold = False
+                self.failed_iou_count += 1
             else:
                 self.logger.info(f"iou test passed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, iou: {max_iou}")
                 passed_iou_threshold = True
                 true_object.passed_iou_threshold = True
+                self.passed_iou_count += 1
 
             
             correct_classification = None
@@ -189,10 +176,12 @@ class TestDetection:
                 self.logger.info(f"class test passed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, predicted: {predicted_object_class}, true: {true_class} ")
                 correct_classification = True
                 true_object.correct_classification = True
+                self.passed_class_count += 1
             else:
                 self.logger.error(f"class test failed for:, {prediction.names[int(true_object.object_class)]}, using model:, {model_tuple.model_weight_file}, predicted: {predicted_object_class}, true: {true_class} ")
                 test_passed=False
                 correct_classification = False
+                self.failed_class_count += 1
 
         
         names = prediction.names
@@ -205,6 +194,13 @@ class TestDetection:
         filepath, file_extension = os.path.splitext(img_object.img_url)
         filename = filepath.split(os.sep)[-1]
         cv2.imwrite(os.path.join("output",filename+file_extension), img)
+
+        return {
+            "passed_iou_count" : self.passed_iou_count,
+            "failed_iou_count" : self.failed_iou_count,
+            "passed_class_count" : self.passed_class_count,
+            "failed_class_count" : self.failed_class_count
+        }
     
     def test(self):
         test_passed = True
@@ -214,12 +210,25 @@ class TestDetection:
             self.logger.info(f"testing: {model_tuple.model_weight_file}")
 
             if PARALLEL:
+                results = []
                 with Pool(os.cpu_count()) as p:
-                    p.map(self.test_img_parallel, [(img_object, model_tuple) for img_object in self.img_objects])
+                    results.extend(p.map(self.test_img_parallel, [(img_object, model_tuple) for img_object in self.img_objects]))
+                
+                for result in results:
+                    self.passed_iou_count += result["passed_iou_count"]
+                    self.failed_iou_count += result["failed_iou_count"]
+                    self.passed_class_count += result["passed_class_count"]
+                    self.failed_class_count += result["failed_class_count"]
             else:
                 for img_object in self.img_objects:
                     self.test_img(img_object, model_tuple)
                 
+    def print_results(self):
+        self.logger.info(f"passed_iou_count: {self.passed_iou_count}")
+        self.logger.info(f"failed_iou_count: {self.failed_iou_count}")
+        self.logger.info(f"passed_class_count: {self.passed_class_count}")
+        self.logger.info(f"failed_class_count: {self.failed_class_count}")
+
     def clean(self):
         self.logger.info("cleaning up...")
         delete_specific_files('.', '._')
@@ -228,3 +237,4 @@ if __name__ == "__main__":
     testObject = TestDetection()
     testObject.test()
     testObject.clean()
+    testObject.print_results()
