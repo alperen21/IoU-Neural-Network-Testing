@@ -72,12 +72,12 @@ class TestDetection:
 
     def draw_square(self, img, label, index, x, y, w, h, thickness=1):
         color_map = {
-            '0': (0, 0, 255),
-            '1': (255, 0, 0),
-            '2': (0, 255, 0),
+            'red': (0, 0, 255),
+            'blue': (255, 0, 0),
+            'green': (0, 255, 0),
             # Additional labels can be added here if necessary
         }
-        color = color_map.get(label, (255, 0, 0))  # Default color is white
+        color = color_map.get(label, (255, 255, 255))  # Default color is white
 
         cv2.rectangle(img, (x, y), (x + w, y + h), color, thickness)
         cv2.putText(img, str(index), (x + w, y + h), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
@@ -100,7 +100,24 @@ class TestDetection:
 
         h,w,c = img.shape
         for obj in objects:
-            message = ""
+            message = []
+            color = None
+
+            if obj.passed_iou_threshold and obj.correct_classification:
+                continue
+
+            if not obj.passed_iou_threshold:
+                color = "yellow"
+                message.append("iou")
+            if not obj.correct_classification:
+                color = "red"
+                object_class = int(obj.object_class)
+                object_class_name = names[object_class]
+                message.append(object_class_name)
+
+            
+
+
 
             # Convert normalized coordinates to absolute coordinates and apply a small adjustment
             p0,p1,p2,p3 = obj.bounding_box
@@ -112,7 +129,7 @@ class TestDetection:
             x_min = int(x_max - w_box)
             y_min = int(y_max - h_box)
 
-            self.draw_square(img, "label", 1, x_min, y_min, w_box, h_box, thickness=1)
+            self.draw_square(img, color, " ".join(message), x_min, y_min, w_box, h_box, thickness=1)
 
             
         # Show the image
