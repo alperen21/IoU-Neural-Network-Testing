@@ -15,6 +15,7 @@ class Object:
         self.bounding_box = bounding_box
         self.correct_classification = correct_classification
         self.passed_iou_threshold = passed_iou_threshold
+        self.detected = False
     
     def __repr__(self) -> str:
         return f"""
